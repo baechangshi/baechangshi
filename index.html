@@ -20,9 +20,18 @@
   }
 
   html { background: var(--bg); color: var(--fg); font-family: var(--mono); }
-  body { min-height: 100vh; overflow-x: hidden; cursor: none; }
+  body { min-height: 100vh; overflow-x: hidden; }
 
-  ::selection { background: #fff; color: #000; }
+  @media (pointer: fine) {
+    body { cursor: none; }
+    * { cursor: none !important; }
+  }
+
+  input, textarea, select { font-size: 16px; }
+
+  @media (pointer: fine) {
+    input, textarea, select { font-size: inherit; }
+  }
   ::-webkit-scrollbar { width: 2px; background: #000; }
   ::-webkit-scrollbar-thumb { background: #1a1a1a; }
 
@@ -250,10 +259,6 @@
     main { padding: 90px 20px 100px; }
     .home-title { font-size: 48px; }
     #player-bar { padding: 12px 20px; }
-    #cursor { display: none; }
-    body { cursor: auto; }
-    * { cursor: auto !important; }
-    .ask-input, .field, input, textarea { font-size: 16px !important; }
   }
 </style>
 </head>
@@ -360,12 +365,16 @@
 <script>
 // ── CURSOR ──────────────────────────────────────────────────────────
 const cur = document.getElementById('cursor');
-document.addEventListener('mousemove', function(e) {
-  cur.style.left = e.clientX + 'px';
-  cur.style.top  = e.clientY + 'px';
-  cur.style.opacity = '1';
-});
-document.addEventListener('mouseleave', function() { cur.style.opacity = '0'; });
+if (window.matchMedia('(pointer: fine)').matches) {
+  document.addEventListener('mousemove', function(e) {
+    cur.style.left = e.clientX + 'px';
+    cur.style.top  = e.clientY + 'px';
+    cur.style.opacity = '1';
+  });
+  document.addEventListener('mouseleave', function() { cur.style.opacity = '0'; });
+} else {
+  cur.style.display = 'none';
+}
 
 // ── STORAGE ─────────────────────────────────────────────────────────
 function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } }
