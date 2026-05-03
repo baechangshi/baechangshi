@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>baechangshi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #000;
+    --fg: #fff;
+    --dim: #333;
+    --dimmer: #1a1a1a;
+    --line: #0f0f0f;
+    --mono: 'Share Tech Mono', monospace;
+    --vt: 'VT323', monospace;
+  }
+
+  html { background: var(--bg); color: var(--fg); font-family: var(--mono); }
+  body { min-height: 100vh; overflow-x: hidden; cursor: none; }
+
+  ::selection { background: #fff; color: #000; }
+  ::-webkit-scrollbar { width: 2px; background: #000; }
+  ::-webkit-scrollbar-thumb { background: #1a1a1a; }
+
+  #cursor {
+    position: fixed;
+    width: 8px; height: 8px;
+    background: #fff;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: opacity .1s;
+    image-rendering: pixelated;
+  }
+
+  #scanline {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: rgba(255,255,255,.015);
+    pointer-events: none;
+    z-index: 9998;
+    animation: scanline 10s linear infinite;
+  }
+
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 40px;
+    background: rgba(0,0,0,.96);
+    border-bottom: 1px solid #060606;
+    z-index: 100;
+  }
+  .nav-brand {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: .08em;
+    color: #fff;
+    cursor: none;
+  }
+  .nav-links { display: flex; gap: 24px; align-items: center; }
+  .nav-btn {
+    background: none; border: none;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .1em; color: #333;
+    padding: 2px 0 4px;
+    border-bottom: 1px solid transparent;
+    transition: color .15s, border-color .15s;
+    cursor: none;
+  }
+  .nav-btn:hover { color: #888; }
+  .nav-btn.active { color: #fff; border-bottom-color: #fff; }
+  .nav-dot { color: #111 !important; font-size: 10px; }
+
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 100px 40px 120px;
+  }
+
+  .page { display: none; animation: fadeIn .35s ease; }
+  .page.active { display: block; }
+
+  .home-title {
+    font-family: var(--vt);
+    font-size: 64px;
+    line-height: 1;
+    margin-bottom: 24px;
+    letter-spacing: -.01em;
+  }
+  .home-sub { font-size: 13px; color: #444; letter-spacing: .05em; }
+
+  .page-header { margin-bottom: 48px; padding-bottom: 20px; border-bottom: 1px solid #0a0a0a; }
+  .page-title { font-size: 11px; letter-spacing: .2em; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+  .page-sub { font-size: 10px; color: #888; letter-spacing: .08em; }
+
+  .track-list { display: flex; flex-direction: column; }
+  .track-item {
+    display: flex; gap: 16px; align-items: center;
+    padding: 12px 0;
+    border-top: 1px solid #0c0c0c;
+    cursor: none;
+    transition: border-color .2s;
+  }
+  .track-item:hover { border-top-color: #222; }
+  .track-thumb-wrap {
+    position: relative; flex-shrink: 0;
+    width: 80px; height: 52px;
+    overflow: hidden; background: #090909;
+  }
+  .track-thumb {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    filter: grayscale(100%) brightness(.5);
+    transition: filter .25s;
+  }
+  .track-item:hover .track-thumb,
+  .track-item.playing .track-thumb { filter: none; }
+  .track-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #fff;
+    background: rgba(0,0,0,.5);
+    opacity: 0; transition: opacity .2s;
+  }
+  .track-item:hover .track-overlay,
+  .track-item.playing .track-overlay { opacity: 1; }
+  .track-item.playing { border-top-color: #fff; }
+  .track-info { flex: 1; }
+  .track-title { font-size: 12px; color: #ccc; letter-spacing: .03em; margin-bottom: 4px; }
+  .track-note { font-size: 10px; color: #666; }
+
+  #player-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 12px 40px;
+    background: #030303; border-top: 1px solid #0d0d0d;
+    display: none; justify-content: space-between; align-items: center;
+    z-index: 50;
+  }
+  #player-bar.visible { display: flex; }
+  #player-bar span { font-size: 10px; color: #333; letter-spacing: .08em; }
+
+  .ask-box { border: 1px solid #222; padding: 20px; background: #0d0d0d; }
+  .ask-input {
+    width: 100%; background: none; border: none;
+    font-family: var(--mono); font-size: 12px;
+    color: #ccc; letter-spacing: .03em; line-height: 1.8;
+    resize: none; cursor: none;
+  }
+  .ask-input::placeholder { color: #444; }
+  .ask-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid #1a1a1a;
+  }
+  .ask-count { font-size: 10px; color: #666; }
+  .qa-list { margin-top: 56px; }
+  .qa-item { margin-bottom: 16px; padding: 20px; background: #0d0d0d; border: 1px solid #1a1a1a; }
+  .qa-q, .qa-a { display: flex; gap: 16px; line-height: 1.8; font-size: 12px; }
+  .qa-q { color: #888; margin-bottom: 14px; }
+  .qa-a { color: #ccc; }
+  .qa-label { font-size: 10px; letter-spacing: .2em; color: #555; flex-shrink: 0; padding-top: 2px; }
+
+  .admin-login { display: flex; flex-direction: column; gap: 14px; max-width: 260px; }
+  .admin-tabs { display: flex; gap: 24px; margin-bottom: 8px; }
+  .admin-tab {
+    background: none; border: none;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .1em; color: #222;
+    padding: 2px 0 4px; border-bottom: 1px solid transparent;
+    transition: color .15s, border-color .15s; cursor: none;
+  }
+  .admin-tab.active { color: #fff; border-bottom-color: #fff; }
+  .badge {
+    background: #fff; color: #000;
+    font-size: 9px; padding: 1px 5px;
+    letter-spacing: 0; margin-left: 6px;
+  }
+  .admin-section { display: none; margin-top: 36px; }
+  .admin-section.active { display: block; }
+  .admin-q-item { padding: 16px 0; border-bottom: 1px solid #0a0a0a; }
+  .admin-q-text { font-size: 11px; color: #888; line-height: 1.7; margin-bottom: 10px; }
+  .admin-q-answered .admin-q-text { color: #444; }
+  .admin-q-ans-text { font-size: 11px; color: #555; line-height: 1.7; margin-bottom: 8px; }
+  .add-track-form {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 20px; border: 1px solid #0d0d0d; max-width: 400px;
+    margin-bottom: 36px;
+  }
+  .admin-track-row {
+    display: flex; gap: 12px; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid #0a0a0a;
+  }
+  .admin-thumb {
+    width: 60px; height: 40px; object-fit: cover;
+    filter: grayscale(100%) brightness(.4); flex-shrink: 0;
+  }
+  .admin-track-info { flex: 1; }
+  .admin-track-title { font-size: 12px; color: #666; }
+  .admin-track-note { font-size: 10px; color: #222; margin-top: 2px; }
+  .answered-divider { font-size: 10px; color: #1a1a1a; letter-spacing: .1em; margin: 36px 0 16px; }
+
+  .field {
+    background: none; border: none;
+    border-bottom: 1px solid #111;
+    font-family: var(--mono); font-size: 11px;
+    color: #777; padding: 8px 0; letter-spacing: .05em;
+    width: 100%; cursor: none;
+  }
+  .field::placeholder { color: #1e1e1e; }
+  .field:focus { outline: none; border-bottom-color: #333; }
+  .btn {
+    background: none;
+    border: 1px solid #1a1a1a;
+    font-family: var(--mono); font-size: 11px;
+    color: #555; padding: 7px 16px;
+    letter-spacing: .08em; transition: border-color .15s, color .15s;
+    cursor: none;
+  }
+  .btn:hover { border-color: #444; color: #999; }
+  .del-btn {
+    background: none; border: none;
+    font-family: var(--mono); font-size: 10px;
+    color: #444; letter-spacing: .05em; cursor: none;
+    transition: color .15s; flex-shrink: 0;
+  }
+  .del-btn:hover { color: #888; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .empty { font-size: 11px; color: #666; letter-spacing: .1em; }
+  .error-msg { font-size: 10px; color: #3a3a3a; letter-spacing: .05em; margin-top: 4px; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes scanline {
+    0%   { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  .blink { animation: blink 1s step-end infinite; }
+
+  @media (max-width: 520px) {
+    nav { padding: 18px 20px; }
+    main { padding: 90px 20px 100px; }
+    .home-title { font-size: 48px; }
+    #player-bar { padding: 12px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="scanline"></div>
+
+<nav>
+  <span class="nav-brand" onclick="goto('home')">baechangshi<span class="blink">_</span></span>
+  <div class="nav-links">
+    <button class="nav-btn active" data-page="home"     onclick="goto('home')">home</button>
+    <button class="nav-btn"        data-page="playlist" onclick="goto('playlist')">playlist</button>
+    <button class="nav-btn"        data-page="ask"      onclick="goto('ask')">ask</button>
+    <button class="nav-btn nav-dot"                     onclick="goto('admin')">·</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- HOME -->
+  <div id="page-home" class="page active">
+    <div class="home-title">baechangshi</div>
+
+  </div>
+
+  <!-- PLAYLIST -->
+  <div id="page-playlist" class="page">
+    <div class="page-header">
+      <div class="page-title">playlist</div>
+      <div class="page-sub" id="track-count"></div>
+    </div>
+    <div id="track-list" class="track-list"></div>
+    <div class="empty" id="playlist-empty" style="display:none">no tracks yet.</div>
+  </div>
+
+  <!-- ASK -->
+  <div id="page-ask" class="page">
+    <div class="page-header">
+      <div class="page-title">ask</div>
+      <div class="page-sub">anonymous questions</div>
+    </div>
+    <div class="ask-box">
+      <textarea id="ask-input" class="ask-input" rows="3" maxlength="400" placeholder="type your question..."></textarea>
+      <div class="ask-footer">
+        <span class="ask-count" id="ask-count">0/400</span>
+        <button class="btn" id="ask-send-btn" onclick="submitQuestion()">send &#8594;</button>
+      </div>
+    </div>
+    <div class="qa-list" id="qa-list"></div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="page-admin" class="page">
+    <div class="page-header">
+      <div class="page-title">admin</div>
+    </div>
+
+    <div id="admin-login">
+      <div class="admin-login">
+        <input type="password" id="admin-pw" class="field" placeholder="password"
+               onkeydown="if(event.key==='Enter') adminLogin()">
+        <button class="btn" onclick="adminLogin()">enter &#8594;</button>
+        <div class="error-msg" id="login-error" style="display:none">wrong.</div>
+      </div>
+    </div>
+
+    <div id="admin-panel" style="display:none">
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="adminTab('questions')">
+          questions<span class="badge" id="unanswered-badge" style="display:none"></span>
+        </button>
+        <button class="admin-tab" onclick="adminTab('playlist')">playlist</button>
+      </div>
+
+      <div id="admin-questions" class="admin-section active">
+        <div id="admin-q-list"></div>
+        <div class="empty" id="admin-q-empty" style="display:none">no questions yet.</div>
+      </div>
+
+      <div id="admin-playlist" class="admin-section">
+        <div class="add-track-form">
+          <input id="new-url"   class="field" placeholder="youtube url">
+          <input id="new-title" class="field" placeholder="title (optional)">
+          <input id="new-note"  class="field" placeholder="note (optional)">
+          <div class="error-msg" id="url-error" style="display:none">invalid youtube url</div>
+          <button class="btn" onclick="addTrack()">add track &#8594;</button>
+        </div>
+        <div id="admin-track-list"></div>
+        <div class="empty" id="admin-track-empty" style="display:none">no tracks yet.</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<iframe id="yt-player" style="display:none" allow="autoplay" title="player"></iframe>
+
+<div id="player-bar">
+  <span>now playing</span>
+  <button class="del-btn" style="color:#333;font-size:11px" onclick="stopPlayer()">&#9632; stop</button>
+</div>
+
+<script>
+// ── CURSOR ──────────────────────────────────────────────────────────
+const cur = document.getElementById('cursor');
+document.addEventListener('mousemove', function(e) {
+  cur.style.left = e.clientX + 'px';
+  cur.style.top  = e.clientY + 'px';
+  cur.style.opacity = '1';
+});
+document.addEventListener('mouseleave', function() { cur.style.opacity = '0'; });
+
+// ── STORAGE ─────────────────────────────────────────────────────────
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } }
+function lsSet(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+// ── NAVIGATION ──────────────────────────────────────────────────────
+function goto(page) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn[data-page]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.page === page);
+  });
+  document.getElementById('page-' + page).classList.add('active');
+  if (page === 'playlist') renderPlaylist();
+  if (page === 'ask')      renderAsk();
+  if (page === 'admin')    { if (adminAuthed) { renderAdminQuestions(); renderAdminTracks(); } }
+}
+
+
+
+// ── YOUTUBE ─────────────────────────────────────────────────────────
+function extractYtId(url) {
+  var m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([^&\n?#]{11})/);
+  return m ? m[1] : null;
+}
+function ytThumb(id) { return 'https://img.youtube.com/vi/' + id + '/mqdefault.jpg'; }
+
+// ── PLAYLIST ─────────────────────────────────────────────────────────
+var currentPlaying = null;
+
+function renderPlaylist() {
+  var tracks = lsGet('bcs_tracks') || [];
+  var list   = document.getElementById('track-list');
+  var empty  = document.getElementById('playlist-empty');
+  var count  = document.getElementById('track-count');
+
+  count.textContent = tracks.length + ' track' + (tracks.length !== 1 ? 's' : '');
+  list.innerHTML = '';
+
+  if (!tracks.length) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  tracks.forEach(function(t, i) {
+    var el = document.createElement('div');
+    el.className = 'track-item' + (currentPlaying === t.ytId ? ' playing' : '');
+    el.style.animation = 'fadeIn .3s ease ' + (i * .04) + 's both';
+    el.innerHTML =
+      '<div class="track-thumb-wrap">' +
+        '<img class="track-thumb" src="' + ytThumb(t.ytId) + '" alt="" loading="lazy">' +
+        '<div class="track-overlay">' + (currentPlaying === t.ytId ? '&#9632;' : '&#9654;') + '</div>' +
+      '</div>' +
+      '<div class="track-info">' +
+        '<div class="track-title">' + esc(t.title || 'untitled') + '</div>' +
+        (t.note ? '<div class="track-note">' + esc(t.note) + '</div>' : '') +
+      '</div>';
+    (function(ytId) {
+      el.onclick = function() { togglePlay(ytId); };
+    })(t.ytId);
+    list.appendChild(el);
+  });
+}
+
+function togglePlay(ytId) {
+  if (currentPlaying === ytId) { stopPlayer(); return; }
+  currentPlaying = ytId;
+  document.getElementById('yt-player').src =
+    'https://www.youtube.com/embed/' + ytId + '?autoplay=1&enablejsapi=1';
+  document.getElementById('player-bar').classList.add('visible');
+  renderPlaylist();
+}
+
+function stopPlayer() {
+  currentPlaying = null;
+  document.getElementById('yt-player').src = '';
+  document.getElementById('player-bar').classList.remove('visible');
+  renderPlaylist();
+}
+
+// ── ASK ──────────────────────────────────────────────────────────────
+var askInput = document.getElementById('ask-input');
+askInput.addEventListener('input', function() {
+  document.getElementById('ask-count').textContent = askInput.value.length + '/400';
+});
+askInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.metaKey) submitQuestion();
+});
+
+function submitQuestion() {
+  var text = askInput.value.trim();
+  if (!text) return;
+  var qs = lsGet('bcs_questions') || [];
+  qs.unshift({ id: Date.now().toString(), text: text, answer: null, ts: Date.now() });
+  lsSet('bcs_questions', qs);
+  askInput.value = '';
+  document.getElementById('ask-count').textContent = '0/400';
+  var btn = document.getElementById('ask-send-btn');
+  btn.textContent = 'sent.';
+  setTimeout(function() { btn.innerHTML = 'send &#8594;'; }, 2500);
+  renderAsk();
+}
+
+function renderAsk() {
+  var qs   = (lsGet('bcs_questions') || []).filter(function(q) { return q.answer; });
+  var list = document.getElementById('qa-list');
+  list.innerHTML = '';
+  qs.forEach(function(q, i) {
+    var el = document.createElement('div');
+    el.className = 'qa-item';
+    el.style.animation = 'fadeIn .3s ease ' + (i * .05) + 's both';
+    el.innerHTML =
+      '<div class="qa-q"><span class="qa-label">Q</span>' + esc(q.text) + '</div>' +
+      '<div class="qa-a"><span class="qa-label">A</span>' + esc(q.answer) + '</div>';
+    list.appendChild(el);
+  });
+}
+
+// ── ADMIN ─────────────────────────────────────────────────────────────
+var ADMIN_PW = 'baechangshi2025'; // ← 배포 전 변경하세요
+var adminAuthed = false;
+
+function adminLogin() {
+  var pw = document.getElementById('admin-pw').value;
+  if (pw === ADMIN_PW) {
+    adminAuthed = true;
+    document.getElementById('admin-login').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    renderAdminQuestions();
+    renderAdminTracks();
+  } else {
+    var err = document.getElementById('login-error');
+    err.style.display = 'block';
+    setTimeout(function() { err.style.display = 'none'; }, 1500);
+  }
+}
+
+function adminTab(name) {
+  var names = ['questions', 'playlist'];
+  document.querySelectorAll('.admin-tab').forEach(function(t, i) {
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.admin-section').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('admin-' + name).classList.add('active');
+}
+
+function renderAdminQuestions() {
+  var qs         = lsGet('bcs_questions') || [];
+  var list       = document.getElementById('admin-q-list');
+  var empty      = document.getElementById('admin-q-empty');
+  var badge      = document.getElementById('unanswered-badge');
+  var unanswered = qs.filter(function(q) { return !q.answer; });
+
+  badge.textContent = unanswered.length;
+  badge.style.display = unanswered.length ? '' : 'none';
+  list.innerHTML = '';
+
+  if (!qs.length) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  function makeItem(q) {
+    var el = document.createElement('div');
+    el.className = 'admin-q-item' + (q.answer ? ' admin-q-answered' : '');
+    el.id = 'aq-' + q.id;
+    if (!q.answer) {
+      el.innerHTML =
+        '<div class="admin-q-text">' + esc(q.text) + '</div>' +
+        '<textarea class="field" id="ans-' + q.id + '" rows="2" ' +
+          'style="resize:vertical;width:100%;margin-bottom:8px" ' +
+          'placeholder="answer..."></textarea>' +
+        '<div class="row">' +
+          '<button class="btn" id="pub-' + q.id + '">publish &#8594;</button>' +
+          '<button class="del-btn" id="del-' + q.id + '">delete</button>' +
+        '</div>';
+    } else {
+      el.innerHTML =
+        '<div class="admin-q-text">' + esc(q.text) + '</div>' +
+        '<div class="admin-q-ans-text">' + esc(q.answer) + '</div>' +
+        '<div class="row">' +
+          '<button class="del-btn" id="edit-' + q.id + '">edit</button>' +
+          '<button class="del-btn" id="del-' + q.id + '">&#10005;</button>' +
+        '</div>';
+    }
+    list.appendChild(el);
+
+    // bind events after appending
+    var delBtn = document.getElementById('del-' + q.id);
+    if (delBtn) delBtn.onclick = function() { deleteQuestion(q.id); };
+    if (!q.answer) {
+      var pubBtn = document.getElementById('pub-' + q.id);
+      if (pubBtn) pubBtn.onclick = function() { publishAnswer(q.id); };
+    } else {
+      var editBtn = document.getElementById('edit-' + q.id);
+      if (editBtn) editBtn.onclick = function() { editAnswer(q.id); };
+    }
+  }
+
+  unanswered.forEach(makeItem);
+  var answered = qs.filter(function(q) { return q.answer; });
+  if (answered.length) {
+    var div = document.createElement('div');
+    div.className = 'answered-divider';
+    div.textContent = 'answered';
+    list.appendChild(div);
+    answered.forEach(makeItem);
+  }
+}
+
+function publishAnswer(id) {
+  var textarea = document.getElementById('ans-' + id);
+  if (!textarea) return;
+  var ans = textarea.value.trim();
+  if (!ans) return;
+  var qs = lsGet('bcs_questions') || [];
+  var updated = qs.map(function(q) { return q.id === id ? Object.assign({}, q, { answer: ans }) : q; });
+  lsSet('bcs_questions', updated);
+  renderAdminQuestions();
+}
+
+function editAnswer(id) {
+  var qs = lsGet('bcs_questions') || [];
+  var updated = qs.map(function(q) { return q.id === id ? Object.assign({}, q, { answer: null }) : q; });
+  lsSet('bcs_questions', updated);
+  renderAdminQuestions();
+}
+
+function deleteQuestion(id) {
+  var qs = (lsGet('bcs_questions') || []).filter(function(q) { return q.id !== id; });
+  lsSet('bcs_questions', qs);
+  renderAdminQuestions();
+}
+
+function renderAdminTracks() {
+  var tracks = lsGet('bcs_tracks') || [];
+  var list   = document.getElementById('admin-track-list');
+  var empty  = document.getElementById('admin-track-empty');
+  list.innerHTML = '';
+  if (!tracks.length) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  tracks.forEach(function(t) {
+    var el = document.createElement('div');
+    el.className = 'admin-track-row';
+    el.innerHTML =
+      '<img class="admin-thumb" src="' + ytThumb(t.ytId) + '" alt="" loading="lazy">' +
+      '<div class="admin-track-info">' +
+        '<div class="admin-track-title">' + esc(t.title || 'untitled') + '</div>' +
+        (t.note ? '<div class="admin-track-note">' + esc(t.note) + '</div>' : '') +
+      '</div>' +
+      '<button class="del-btn" id="delt-' + t.ytId + '">&#10005;</button>';
+    list.appendChild(el);
+    (function(ytId) {
+      var btn = document.getElementById('delt-' + ytId);
+      if (btn) btn.onclick = function() { deleteTrack(ytId); };
+    })(t.ytId);
+  });
+}
+
+function addTrack() {
+  var url   = document.getElementById('new-url').value.trim();
+  var title = document.getElementById('new-title').value.trim();
+  var note  = document.getElementById('new-note').value.trim();
+  var ytId  = extractYtId(url);
+  var err   = document.getElementById('url-error');
+  if (!ytId) { err.textContent = 'invalid youtube url'; err.style.display = ''; return; }
+  var tracks = lsGet('bcs_tracks') || [];
+  if (tracks.find(function(t) { return t.ytId === ytId; })) {
+    err.textContent = 'already added'; err.style.display = ''; return;
+  }
+  err.style.display = 'none';
+  tracks.unshift({ id: ytId, ytId: ytId, url: url, title: title || 'untitled', note: note, addedAt: Date.now() });
+  lsSet('bcs_tracks', tracks);
+  document.getElementById('new-url').value   = '';
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-note').value  = '';
+  renderAdminTracks();
+}
+
+function deleteTrack(ytId) {
+  var tracks = (lsGet('bcs_tracks') || []).filter(function(t) { return t.ytId !== ytId; });
+  lsSet('bcs_tracks', tracks);
+  renderAdminTracks();
+  if (currentPlaying === ytId) stopPlayer();
+}
+
+// ── UTIL ─────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
